@@ -127,6 +127,7 @@ def test_common_environment_defaults_are_small_and_universal():
 def test_benchmark_common_disables_checkpoint_io_and_preserves_legacy_defaults():
     cfg = SimpleNamespace(
         train=SimpleNamespace(train_iters=0, eval_iters=1, manual_gc=False, manual_gc_interval=0),
+        validation=SimpleNamespace(eval_iters=1, eval_interval=1),
         tokenizer=SimpleNamespace(use_tokenizer_vocab_size=True),
         checkpoint=SimpleNamespace(save="checkpoint", load="checkpoint"),
         logger=SimpleNamespace(log_interval=10, tensorboard_dir="tensorboard"),
@@ -148,6 +149,8 @@ def test_benchmark_common_disables_checkpoint_io_and_preserves_legacy_defaults()
 
     assert cfg.train.manual_gc is True
     assert cfg.train.manual_gc_interval == 100
+    assert cfg.validation.eval_iters == 0
+    assert cfg.validation.eval_interval == 0
     assert cfg.tokenizer.use_tokenizer_vocab_size is False
     assert cfg.checkpoint.save is None
     assert cfg.checkpoint.load is None

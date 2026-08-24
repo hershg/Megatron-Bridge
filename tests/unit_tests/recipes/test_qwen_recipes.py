@@ -765,6 +765,55 @@ def test_qwen3_30b_a3b_h100_fp8ds_inherits_fp8cs_layout_with_delayed_scaling(
     assert fp8ds.env_vars == fp8cs.env_vars
 
 
+def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_verified_functional_config(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """The GB200 MXFP8 perf recipe only layers benchmark behavior on its verified recipe."""
+    from megatron.bridge.perf_recipes.qwen.gb200.qwen3_moe import (
+        qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config,
+    )
+    from megatron.bridge.recipes.qwen.gb200.qwen3_moe import (
+        qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config,
+    )
+
+    mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
+    patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeBridge)
+
+    functional_cfg = qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config()
+    perf_cfg = qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config()
+
+    # Training-equivalent settings come from the convergence-verified recipe.
+    assert perf_cfg.mixed_precision == functional_cfg.mixed_precision
+    assert perf_cfg.model.tensor_model_parallel_size == functional_cfg.model.tensor_model_parallel_size
+    assert perf_cfg.model.pipeline_model_parallel_size == functional_cfg.model.pipeline_model_parallel_size
+    assert perf_cfg.model.context_parallel_size == functional_cfg.model.context_parallel_size
+    assert perf_cfg.model.expert_model_parallel_size == functional_cfg.model.expert_model_parallel_size
+    assert perf_cfg.model.expert_tensor_parallel_size == functional_cfg.model.expert_tensor_parallel_size
+    assert perf_cfg.model.sequence_parallel == functional_cfg.model.sequence_parallel
+    assert perf_cfg.train.global_batch_size == functional_cfg.train.global_batch_size
+    assert perf_cfg.train.micro_batch_size == functional_cfg.train.micro_batch_size
+    assert perf_cfg.model.moe_flex_dispatcher_backend == functional_cfg.model.moe_flex_dispatcher_backend
+    assert perf_cfg.model.moe_token_dispatcher_type == functional_cfg.model.moe_token_dispatcher_type
+    assert perf_cfg.model.moe_a2a_overlap == functional_cfg.model.moe_a2a_overlap
+    assert perf_cfg.comm_overlap == functional_cfg.comm_overlap
+
+    # Benchmark-only policy remains outside the functional recipe.
+    assert functional_cfg.model.moe_router_force_load_balancing is False
+    assert perf_cfg.model.moe_router_force_load_balancing is True
+    assert functional_cfg.train.train_iters == 100
+    assert perf_cfg.train.train_iters == 50
+    assert functional_cfg.ddp.check_for_nan_in_grad is True
+    assert perf_cfg.ddp.check_for_nan_in_grad is False
+    assert functional_cfg.rerun_state_machine.check_for_nan_in_loss is True
+    assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
+
+    # Full-iteration graphs stay a benchmark candidate until convergence verification.
+    assert functional_cfg.model.cuda_graph_impl == "transformer_engine"
+    assert functional_cfg.model.cuda_graph_scope == ["moe_router", "moe_preprocess"]
+    assert perf_cfg.model.cuda_graph_impl == "full_iteration"
+    assert perf_cfg.model.cuda_graph_scope == []
+
+
 def test_qwen3_235b_a22b_lora_defaults(monkeypatch: pytest.MonkeyPatch):
     """Test that 235B-A22B LoRA has correct default parallelism."""
     from megatron.bridge.recipes.qwen import qwen3_235b_a22b_peft_config
