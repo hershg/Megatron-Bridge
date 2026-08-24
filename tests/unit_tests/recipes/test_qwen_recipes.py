@@ -673,7 +673,7 @@ def test_qwen3_30b_a3b_pretrain_defaults(monkeypatch: pytest.MonkeyPatch):
     assert cfg.comm_overlap.tp_comm_overlap is True
 
 
-def test_qwen3_30b_a3b_bf16_perf_recipe_uses_default_functional_config(
+def test_qwen3_30b_a3b_bf16_perf_recipe_uses_default_main_config(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """Test that the H100 BF16 perf recipe only adds benchmark-specific overrides."""
@@ -765,7 +765,7 @@ def test_qwen3_30b_a3b_h100_fp8ds_inherits_fp8cs_layout_with_delayed_scaling(
     assert fp8ds.env_vars == fp8cs.env_vars
 
 
-def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_verified_functional_config(
+def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     monkeypatch: pytest.MonkeyPatch,
 ):
     """The GB200 MXFP8 perf recipe only layers benchmark behavior on its verified recipe."""
@@ -773,49 +773,49 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_verified_functional_config(
         qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config,
     )
     from megatron.bridge.recipes.qwen.gb200.qwen3_moe import (
-        qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config,
+        qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config as main_recipe,
     )
 
     mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
     patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeBridge)
 
-    functional_cfg = qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config()
+    main_cfg = main_recipe()
     perf_cfg = qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config()
 
-    # Training-equivalent settings come from the convergence-verified recipe.
-    assert perf_cfg.mixed_precision == functional_cfg.mixed_precision
-    assert perf_cfg.model.tensor_model_parallel_size == functional_cfg.model.tensor_model_parallel_size
-    assert perf_cfg.model.pipeline_model_parallel_size == functional_cfg.model.pipeline_model_parallel_size
-    assert perf_cfg.model.context_parallel_size == functional_cfg.model.context_parallel_size
-    assert perf_cfg.model.expert_model_parallel_size == functional_cfg.model.expert_model_parallel_size
-    assert perf_cfg.model.expert_tensor_parallel_size == functional_cfg.model.expert_tensor_parallel_size
-    assert perf_cfg.model.sequence_parallel == functional_cfg.model.sequence_parallel
-    assert perf_cfg.train.global_batch_size == functional_cfg.train.global_batch_size
-    assert perf_cfg.train.micro_batch_size == functional_cfg.train.micro_batch_size
-    assert perf_cfg.model.moe_flex_dispatcher_backend == functional_cfg.model.moe_flex_dispatcher_backend
-    assert perf_cfg.model.moe_token_dispatcher_type == functional_cfg.model.moe_token_dispatcher_type
-    assert perf_cfg.model.moe_a2a_overlap == functional_cfg.model.moe_a2a_overlap
-    assert perf_cfg.comm_overlap == functional_cfg.comm_overlap
+    # Training-equivalent settings come from the main recipe.
+    assert perf_cfg.mixed_precision == main_cfg.mixed_precision
+    assert perf_cfg.model.tensor_model_parallel_size == main_cfg.model.tensor_model_parallel_size
+    assert perf_cfg.model.pipeline_model_parallel_size == main_cfg.model.pipeline_model_parallel_size
+    assert perf_cfg.model.context_parallel_size == main_cfg.model.context_parallel_size
+    assert perf_cfg.model.expert_model_parallel_size == main_cfg.model.expert_model_parallel_size
+    assert perf_cfg.model.expert_tensor_parallel_size == main_cfg.model.expert_tensor_parallel_size
+    assert perf_cfg.model.sequence_parallel == main_cfg.model.sequence_parallel
+    assert perf_cfg.train.global_batch_size == main_cfg.train.global_batch_size
+    assert perf_cfg.train.micro_batch_size == main_cfg.train.micro_batch_size
+    assert perf_cfg.model.moe_flex_dispatcher_backend == main_cfg.model.moe_flex_dispatcher_backend
+    assert perf_cfg.model.moe_token_dispatcher_type == main_cfg.model.moe_token_dispatcher_type
+    assert perf_cfg.model.moe_a2a_overlap == main_cfg.model.moe_a2a_overlap
+    assert perf_cfg.comm_overlap == main_cfg.comm_overlap
 
-    # Benchmark-only policy remains outside the functional recipe.
-    assert functional_cfg.model.moe_router_force_load_balancing is False
+    # Benchmark-only policy remains outside the main recipe.
+    assert main_cfg.model.moe_router_force_load_balancing is False
     assert perf_cfg.model.moe_router_force_load_balancing is True
-    assert functional_cfg.train.train_iters == 100
+    assert main_cfg.train.train_iters == 100
     assert perf_cfg.train.train_iters == 50
-    assert functional_cfg.ddp.check_for_nan_in_grad is True
+    assert main_cfg.ddp.check_for_nan_in_grad is True
     assert perf_cfg.ddp.check_for_nan_in_grad is False
-    assert functional_cfg.rerun_state_machine.check_for_nan_in_loss is True
+    assert main_cfg.rerun_state_machine.check_for_nan_in_loss is True
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
 
     # Full-iteration graphs stay a benchmark candidate until convergence verification.
-    assert functional_cfg.model.cuda_graph_impl == "transformer_engine"
-    assert functional_cfg.model.cuda_graph_scope == ["moe_router", "moe_preprocess"]
+    assert main_cfg.model.cuda_graph_impl == "transformer_engine"
+    assert main_cfg.model.cuda_graph_scope == ["moe_router", "moe_preprocess"]
     assert perf_cfg.model.cuda_graph_impl == "full_iteration"
     assert perf_cfg.model.cuda_graph_scope == []
 
 
 @pytest.mark.parametrize(
-    ("functional_recipe_name", "perf_module_name", "perf_recipe_name"),
+    ("main_recipe_name", "perf_module_name", "perf_recipe_name"),
     [
         (
             "qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config",
@@ -829,9 +829,9 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_verified_functional_config(
         ),
     ],
 )
-def test_qwen3_235b_blackwell_functional_candidates_match_measured_perf_settings(
+def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     monkeypatch: pytest.MonkeyPatch,
-    functional_recipe_name: str,
+    main_recipe_name: str,
     perf_module_name: str,
     perf_recipe_name: str,
 ):
@@ -839,16 +839,16 @@ def test_qwen3_235b_blackwell_functional_candidates_match_measured_perf_settings
     mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
     patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeBridge)
 
-    functional_recipe = getattr(_qwen_module, functional_recipe_name)
+    main_recipe = getattr(_qwen_module, main_recipe_name)
     perf_recipe = getattr(importlib.import_module(perf_module_name), perf_recipe_name)
-    functional_cfg = functional_recipe()
+    main_cfg = main_recipe()
     perf_cfg = perf_recipe()
 
-    assert functional_cfg.mixed_precision == perf_cfg.mixed_precision
-    assert functional_cfg.comm_overlap == perf_cfg.comm_overlap
-    assert functional_cfg.env_vars == perf_cfg.env_vars
-    assert functional_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
-    assert functional_cfg.train.micro_batch_size == perf_cfg.train.micro_batch_size
+    assert main_cfg.mixed_precision == perf_cfg.mixed_precision
+    assert main_cfg.comm_overlap == perf_cfg.comm_overlap
+    assert main_cfg.env_vars == perf_cfg.env_vars
+    assert main_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
+    assert main_cfg.train.micro_batch_size == perf_cfg.train.micro_batch_size
 
     equivalent_model_fields = (
         "tensor_model_parallel_size",
@@ -870,20 +870,20 @@ def test_qwen3_235b_blackwell_functional_candidates_match_measured_perf_settings
         "moe_router_fusion",
     )
     for field_name in equivalent_model_fields:
-        assert getattr(functional_cfg.model, field_name) == getattr(perf_cfg.model, field_name)
+        assert getattr(main_cfg.model, field_name) == getattr(perf_cfg.model, field_name)
 
     # Only the benchmark owns synthetic routing and the short-run policy.
-    assert functional_cfg.model.moe_router_force_load_balancing is False
+    assert main_cfg.model.moe_router_force_load_balancing is False
     assert perf_cfg.model.moe_router_force_load_balancing is True
-    assert functional_cfg.tokenizer.use_tokenizer_vocab_size is True
+    assert main_cfg.tokenizer.use_tokenizer_vocab_size is True
     assert perf_cfg.tokenizer.use_tokenizer_vocab_size is False
-    assert functional_cfg.checkpoint.save is not None
+    assert main_cfg.checkpoint.save is not None
     assert perf_cfg.checkpoint.save is None
-    assert functional_cfg.ddp.check_for_nan_in_grad is True
+    assert main_cfg.ddp.check_for_nan_in_grad is True
     assert perf_cfg.ddp.check_for_nan_in_grad is False
-    assert functional_cfg.rerun_state_machine.check_for_nan_in_loss is True
+    assert main_cfg.rerun_state_machine.check_for_nan_in_loss is True
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
-    assert functional_cfg.train.train_iters == 100
+    assert main_cfg.train.train_iters == 100
     assert perf_cfg.train.train_iters == 50
 
 
