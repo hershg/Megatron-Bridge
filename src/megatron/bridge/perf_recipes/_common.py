@@ -66,6 +66,9 @@ def _benchmark_common(cfg: ConfigContainer, cross_entropy_impl: str = "te") -> N
     cfg.scheduler.lr_decay_iters = cfg.train.train_iters
     cfg.scheduler.lr_warmup_iters = 10
 
+    if getattr(cfg.model, "num_moe_experts", None):
+        cfg.model.moe_router_force_load_balancing = True
+
     if hasattr(cfg.model, "use_transformer_engine_op_fuser") and cfg.model.use_transformer_engine_op_fuser:
         cfg.model.use_transformer_engine_op_fuser = False
     cfg.model.apply_rope_fusion = True

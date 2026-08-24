@@ -777,7 +777,7 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     )
 
     mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
-    patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeBridge)
+    patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeMoeBridge)
 
     main_cfg = main_recipe()
     perf_cfg = qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config()
@@ -837,7 +837,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
 ):
     """Natural-routing candidates preserve every measured training/performance knob."""
     mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
-    patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeBridge)
+    patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeMoeBridge)
 
     main_recipe = getattr(_qwen_module, main_recipe_name)
     perf_recipe = getattr(importlib.import_module(perf_module_name), perf_recipe_name)
