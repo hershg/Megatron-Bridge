@@ -364,6 +364,52 @@ Stream tensors from the training side to your inference runtime without writing 
 - **Device routing:** Handles are returned under a `device_uuid` key (NVML UUID of the CUDA device). The inference side should map handles on the same device (or coordinate via your communicator). For collective updates, the worker can also broadcast tensors directly (`broadcast_weights_for_collective`).
 - **Parallelism nuances:** With TP/EP, exported HF tensors are reassembled from shards; with CP/sequence packing, shapes/dtypes are already consistent at export time. FP8 or mixed precision can affect size estimates; the worker accounts for dtype scaling when estimating bytes.
 
+**Version and verify the exported tensor inventory:** Record metadata during the existing one-shot
+`export_hf_weights()` stream, then send a transport-neutral manifest as the stream trailer. The recorder retains only
+names, shapes, and dtypes, so it does not buffer tensor payloads or repeat the export. On the consumer, record metadata
+while staging each tensor and validate the trailer before making `target_version` visible to rollout workers.
+
+```python
+from megatron.bridge.models.conversion import WeightUpdateManifest, WeightUpdateRecorder
+
+# Producer: tensor frames and their metadata are produced in the same pass.
+sent_inventory = WeightUpdateRecorder()
+for name, tensor in sent_inventory.track(bridge.export_hf_weights([model], show_progress=False)):
+    send_tensor(name, tensor)
+
+manifest = sent_inventory.build_manifest(
+    model_id="meta-llama/Llama-3.2-1B",
+    model_config_id="hf-config-revision-or-digest",
+    update_mode="full",
+    base_version="step-99",
+    target_version="step-100",
+)
+send_manifest(manifest.to_json())  # trailer after the final tensor frame
+
+# Consumer: stage frames and retain only their metadata until the trailer arrives.
+received_inventory = WeightUpdateRecorder()
+for name, tensor in receive_tensors():
+    stage_tensor(name, tensor)
+    received_inventory.record(name, tensor)
+
+received_manifest = WeightUpdateManifest.from_json(receive_manifest())
+received_manifest.validate(
+    received_inventory,
+    expected_model_id="meta-llama/Llama-3.2-1B",
+    expected_model_config_id="hf-config-revision-or-digest",
+    expected_update_mode="full",
+    current_version="step-99",
+    expected_target_version="step-100",
+)
+activate_staged_weights(received_manifest.target_version)
+```
+
+Validation catches transport omissions, duplicates, reordering, and shape/dtype mismatches relative to the producer's
+recorded inventory, and rejects stale or wrong model/config/update context. It does not independently prove that the
+producer exported every model tensor. The metadata digest detects accidental manifest corruption; it is neither a
+tensor-content checksum nor an authentication mechanism. Content hashing, acknowledgement, retry, and atomic runtime
+activation remain consumer/transport responsibilities.
+
 ```python
 import os
 import torch
