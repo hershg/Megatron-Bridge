@@ -814,6 +814,79 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_verified_functional_config(
     assert perf_cfg.model.cuda_graph_scope == []
 
 
+@pytest.mark.parametrize(
+    ("functional_recipe_name", "perf_module_name", "perf_recipe_name"),
+    [
+        (
+            "qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config",
+            "megatron.bridge.perf_recipes.qwen.gb200.qwen3_moe",
+            "qwen3_235b_a22b_pretrain_256gpu_gb200_fp8mx_config",
+        ),
+        (
+            "qwen3_235b_a22b_256gpu_gb300_fp8mx_pretrain_config",
+            "megatron.bridge.perf_recipes.qwen.gb300.qwen3_moe",
+            "qwen3_235b_a22b_pretrain_256gpu_gb300_fp8mx_config",
+        ),
+    ],
+)
+def test_qwen3_235b_blackwell_functional_candidates_match_measured_perf_settings(
+    monkeypatch: pytest.MonkeyPatch,
+    functional_recipe_name: str,
+    perf_module_name: str,
+    perf_recipe_name: str,
+):
+    """Natural-routing candidates preserve every measured training/performance knob."""
+    mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
+    patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeBridge)
+
+    functional_recipe = getattr(_qwen_module, functional_recipe_name)
+    perf_recipe = getattr(importlib.import_module(perf_module_name), perf_recipe_name)
+    functional_cfg = functional_recipe()
+    perf_cfg = perf_recipe()
+
+    assert functional_cfg.mixed_precision == perf_cfg.mixed_precision
+    assert functional_cfg.comm_overlap == perf_cfg.comm_overlap
+    assert functional_cfg.env_vars == perf_cfg.env_vars
+    assert functional_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
+    assert functional_cfg.train.micro_batch_size == perf_cfg.train.micro_batch_size
+
+    equivalent_model_fields = (
+        "tensor_model_parallel_size",
+        "pipeline_model_parallel_size",
+        "context_parallel_size",
+        "virtual_pipeline_model_parallel_size",
+        "expert_model_parallel_size",
+        "expert_tensor_parallel_size",
+        "sequence_parallel",
+        "moe_flex_dispatcher_backend",
+        "moe_token_dispatcher_type",
+        "moe_hybridep_num_sms",
+        "cuda_graph_impl",
+        "cuda_graph_scope",
+        "moe_paged_stash",
+        "moe_expert_rank_capacity_factor",
+        "bias_activation_fusion",
+        "apply_rope_fusion",
+        "moe_router_fusion",
+    )
+    for field_name in equivalent_model_fields:
+        assert getattr(functional_cfg.model, field_name) == getattr(perf_cfg.model, field_name)
+
+    # Only the benchmark owns synthetic routing and the short-run policy.
+    assert functional_cfg.model.moe_router_force_load_balancing is False
+    assert perf_cfg.model.moe_router_force_load_balancing is True
+    assert functional_cfg.tokenizer.use_tokenizer_vocab_size is True
+    assert perf_cfg.tokenizer.use_tokenizer_vocab_size is False
+    assert functional_cfg.checkpoint.save is not None
+    assert perf_cfg.checkpoint.save is None
+    assert functional_cfg.ddp.check_for_nan_in_grad is True
+    assert perf_cfg.ddp.check_for_nan_in_grad is False
+    assert functional_cfg.rerun_state_machine.check_for_nan_in_loss is True
+    assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
+    assert functional_cfg.train.train_iters == 100
+    assert perf_cfg.train.train_iters == 50
+
+
 def test_qwen3_235b_a22b_lora_defaults(monkeypatch: pytest.MonkeyPatch):
     """Test that 235B-A22B LoRA has correct default parallelism."""
     from megatron.bridge.recipes.qwen import qwen3_235b_a22b_peft_config

@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+from megatron.bridge.recipes.qwen.common import _qwen3_235b_a22b_pretrain_256gpu_blackwell_fp8mx_config
 from megatron.bridge.recipes.qwen.h100.qwen3_moe import (
     qwen3_30b_a3b_pretrain_16gpu_h100_bf16_config,
 )
@@ -23,6 +24,30 @@ from megatron.bridge.recipes.utils.environment_utils import COMMON_RECIPE_ENV_VA
 from megatron.bridge.training.comm_overlap import CommOverlapConfig
 from megatron.bridge.training.config import ConfigContainer
 from megatron.bridge.training.mixed_precision import bf16_with_mxfp8_mixed
+
+
+def qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config() -> ConfigContainer:
+    """Return the natural-routing Qwen3-235B MXFP8 candidate for 256 GB200 GPUs."""
+    cfg = _qwen3_235b_a22b_pretrain_256gpu_blackwell_fp8mx_config(
+        pipeline_parallel_size=8,
+        virtual_pipeline_parallel_size=3,
+        micro_batch_size=1,
+    )
+    cfg.env_vars = {
+        **COMMON_RECIPE_ENV_VARS,
+        "CUDA_DEVICE_MAX_CONNECTIONS": 32,
+        "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True,graph_capture_record_stream_reuse:True",
+        "TORCH_NCCL_AVOID_RECORD_STREAMS": 0,
+        "NUM_OF_HYBRID_EP_RANKS_PER_NVLINK_DOMAIN": 32,
+        "NUM_OF_TOKENS_PER_CHUNK_COMBINE_API": 128,
+        "NVLINK_DOMAIN_SIZE": 72,
+        "USE_MNNVL": 1,
+        "CUDNNFE_CLUSTER_OVERLAP_MARGIN": 8,
+        "NVTE_BWD_LAYERNORM_SM_MARGIN": 20,
+        "NVTE_CUTEDSL_FUSED_GROUPED_MLP": 1,
+        "NVTE_FWD_LAYERNORM_SM_MARGIN": 20,
+    }
+    return cfg
 
 
 def qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config() -> ConfigContainer:
@@ -97,4 +122,7 @@ def qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config() -> ConfigContain
     return cfg
 
 
-__all__ = ["qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config"]
+__all__ = [
+    "qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_functional_config",
+    "qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config",
+]
