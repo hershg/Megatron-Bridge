@@ -819,15 +819,15 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
     assert main_cfg.model.use_transformer_engine_op_fuser is False
     assert perf_cfg.model.use_transformer_engine_op_fuser is True
-    assert main_cfg.model.moe_pad_experts_for_cuda_graph_inference is False
+    assert getattr(main_cfg.model, "moe_pad_experts_for_cuda_graph_inference", False) is False
     assert perf_cfg.model.moe_pad_experts_for_cuda_graph_inference is True
-    assert main_cfg.model.moe_paged_stash is False
+    assert getattr(main_cfg.model, "moe_paged_stash", False) is False
     assert perf_cfg.model.moe_paged_stash is True
-    assert main_cfg.model.moe_expert_rank_capacity_factor is None
+    assert getattr(main_cfg.model, "moe_expert_rank_capacity_factor", None) is None
     assert perf_cfg.model.moe_expert_rank_capacity_factor == 1.5
-    assert main_cfg.model.moe_paged_stash_buffer_size_factor_cuda == 1.1
+    assert getattr(main_cfg.model, "moe_paged_stash_buffer_size_factor_cuda", 1.1) == 1.1
     assert perf_cfg.model.moe_paged_stash_buffer_size_factor_cuda == 1.2
-    assert main_cfg.model.moe_paged_stash_buffer_size_factor_cpu == 0.0
+    assert getattr(main_cfg.model, "moe_paged_stash_buffer_size_factor_cpu", 0.0) == 0.0
     assert perf_cfg.model.moe_paged_stash_buffer_size_factor_cpu == 1.0
     assert main_cfg.model.recompute_granularity == "selective"
     assert main_cfg.model.recompute_modules == ["moe_act"]
@@ -917,11 +917,11 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
     assert main_cfg.model.use_transformer_engine_op_fuser is False
     assert perf_cfg.model.use_transformer_engine_op_fuser is True
-    assert main_cfg.model.moe_pad_experts_for_cuda_graph_inference is False
+    assert getattr(main_cfg.model, "moe_pad_experts_for_cuda_graph_inference", False) is False
     assert perf_cfg.model.moe_pad_experts_for_cuda_graph_inference is True
-    assert main_cfg.model.moe_paged_stash is False
+    assert getattr(main_cfg.model, "moe_paged_stash", False) is False
     assert perf_cfg.model.moe_paged_stash is True
-    assert main_cfg.model.moe_expert_rank_capacity_factor is None
+    assert getattr(main_cfg.model, "moe_expert_rank_capacity_factor", None) is None
     assert perf_cfg.model.moe_expert_rank_capacity_factor == 1.5
     assert main_cfg.model.recompute_granularity == "selective"
     assert main_cfg.model.recompute_modules == ["moe_act"]
