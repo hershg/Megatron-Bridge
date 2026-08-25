@@ -61,6 +61,8 @@ def qwen3_235b_a22b_256gpu_gb300_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.model.cuda_graph_scope = ["moe_router", "moe_preprocess"]
     cfg.rng.te_rng_tracker = True
     cfg.model.use_te_rng_tracker = True
+    cfg.model.offload_modules = []
+    cfg.model.moe_pad_experts_for_cuda_graph_inference = True
     cfg.model.moe_paged_stash = True
     cfg.model.moe_expert_rank_capacity_factor = 1.5
     cfg.model.moe_paged_stash_buffer_size_factor_cuda = 1.2

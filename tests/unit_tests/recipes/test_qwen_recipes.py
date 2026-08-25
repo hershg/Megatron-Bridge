@@ -797,6 +797,12 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     assert perf_cfg.model.moe_a2a_overlap == main_cfg.model.moe_a2a_overlap
     assert perf_cfg.comm_overlap == main_cfg.comm_overlap
     assert perf_cfg.env_vars == main_cfg.env_vars
+    assert perf_cfg.model.offload_modules == main_cfg.model.offload_modules == []
+    assert (
+        perf_cfg.model.moe_pad_experts_for_cuda_graph_inference
+        == main_cfg.model.moe_pad_experts_for_cuda_graph_inference
+        is True
+    )
     assert perf_cfg.model.moe_paged_stash == main_cfg.model.moe_paged_stash is True
     assert perf_cfg.model.moe_expert_rank_capacity_factor == main_cfg.model.moe_expert_rank_capacity_factor == 1.5
     assert (
@@ -884,6 +890,8 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
         "moe_flex_dispatcher_backend",
         "moe_token_dispatcher_type",
         "moe_hybridep_num_sms",
+        "offload_modules",
+        "moe_pad_experts_for_cuda_graph_inference",
         "moe_paged_stash",
         "moe_expert_rank_capacity_factor",
         "bias_activation_fusion",
