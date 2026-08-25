@@ -796,18 +796,36 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     assert perf_cfg.model.moe_token_dispatcher_type == main_cfg.model.moe_token_dispatcher_type
     assert perf_cfg.model.moe_a2a_overlap == main_cfg.model.moe_a2a_overlap
     assert perf_cfg.comm_overlap == main_cfg.comm_overlap
+    assert perf_cfg.env_vars == main_cfg.env_vars
+    assert perf_cfg.model.moe_paged_stash == main_cfg.model.moe_paged_stash is True
+    assert perf_cfg.model.moe_expert_rank_capacity_factor == main_cfg.model.moe_expert_rank_capacity_factor == 1.5
+    assert (
+        perf_cfg.model.moe_paged_stash_buffer_size_factor_cuda
+        == main_cfg.model.moe_paged_stash_buffer_size_factor_cuda
+        == 1.2
+    )
+    assert (
+        perf_cfg.model.moe_paged_stash_buffer_size_factor_cpu
+        == main_cfg.model.moe_paged_stash_buffer_size_factor_cpu
+        == 1.0
+    )
 
     # Benchmark-only policy remains outside the main recipe.
     assert main_cfg.model.moe_router_force_load_balancing is False
     assert perf_cfg.model.moe_router_force_load_balancing is True
     assert main_cfg.train.train_iters == 100
     assert perf_cfg.train.train_iters == 50
+    assert main_cfg.train.global_batch_size == 512
+    assert main_cfg.train.micro_batch_size == 4
+    assert main_cfg.scheduler.lr_warmup_iters == 40
+    assert main_cfg.scheduler.lr_decay_iters == 100
     assert main_cfg.ddp.check_for_nan_in_grad is True
     assert perf_cfg.ddp.check_for_nan_in_grad is False
     assert main_cfg.rerun_state_machine.check_for_nan_in_loss is True
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
 
-    # Full-iteration graphs stay a benchmark candidate until convergence verification.
+    # Full-iteration graphs conflict with the main recipe's loss-NaN check and
+    # therefore remain benchmark-only.
     assert main_cfg.model.cuda_graph_impl == "transformer_engine"
     assert main_cfg.model.cuda_graph_scope == ["moe_router", "moe_preprocess"]
     assert perf_cfg.model.cuda_graph_impl == "full_iteration"
@@ -861,8 +879,6 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
         "moe_flex_dispatcher_backend",
         "moe_token_dispatcher_type",
         "moe_hybridep_num_sms",
-        "cuda_graph_impl",
-        "cuda_graph_scope",
         "moe_paged_stash",
         "moe_expert_rank_capacity_factor",
         "bias_activation_fusion",
@@ -871,6 +887,13 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     )
     for field_name in equivalent_model_fields:
         assert getattr(main_cfg.model, field_name) == getattr(perf_cfg.model, field_name)
+
+    # Full-iteration graphs conflict with the main recipe's loss-NaN check and
+    # therefore remain benchmark-only.
+    assert main_cfg.model.cuda_graph_impl == "transformer_engine"
+    assert main_cfg.model.cuda_graph_scope == ["moe_router", "moe_preprocess"]
+    assert perf_cfg.model.cuda_graph_impl == "full_iteration"
+    assert perf_cfg.model.cuda_graph_scope == []
 
     # Only the benchmark owns synthetic routing and the short-run policy.
     assert main_cfg.model.moe_router_force_load_balancing is False
@@ -885,6 +908,10 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
     assert main_cfg.train.train_iters == 100
     assert perf_cfg.train.train_iters == 50
+    assert main_cfg.train.global_batch_size == 8192
+    assert main_cfg.train.micro_batch_size == (1 if "gb200" in main_recipe_name else 2)
+    assert main_cfg.scheduler.lr_warmup_iters == 40
+    assert main_cfg.scheduler.lr_decay_iters == 100
 
 
 def test_qwen3_235b_a22b_lora_defaults(monkeypatch: pytest.MonkeyPatch):
