@@ -798,23 +798,6 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     assert perf_cfg.comm_overlap == main_cfg.comm_overlap
     assert perf_cfg.env_vars == main_cfg.env_vars
     assert perf_cfg.model.offload_modules == main_cfg.model.offload_modules == []
-    assert (
-        perf_cfg.model.moe_pad_experts_for_cuda_graph_inference
-        == main_cfg.model.moe_pad_experts_for_cuda_graph_inference
-        is True
-    )
-    assert perf_cfg.model.moe_paged_stash == main_cfg.model.moe_paged_stash is True
-    assert perf_cfg.model.moe_expert_rank_capacity_factor == main_cfg.model.moe_expert_rank_capacity_factor == 1.5
-    assert (
-        perf_cfg.model.moe_paged_stash_buffer_size_factor_cuda
-        == main_cfg.model.moe_paged_stash_buffer_size_factor_cuda
-        == 1.2
-    )
-    assert (
-        perf_cfg.model.moe_paged_stash_buffer_size_factor_cpu
-        == main_cfg.model.moe_paged_stash_buffer_size_factor_cpu
-        == 1.0
-    )
 
     # Benchmark-only policy remains outside the main recipe.
     assert main_cfg.model.moe_router_force_load_balancing is False
@@ -836,6 +819,20 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
     assert main_cfg.model.use_transformer_engine_op_fuser is False
     assert perf_cfg.model.use_transformer_engine_op_fuser is True
+    assert main_cfg.model.moe_pad_experts_for_cuda_graph_inference is False
+    assert perf_cfg.model.moe_pad_experts_for_cuda_graph_inference is True
+    assert main_cfg.model.moe_paged_stash is False
+    assert perf_cfg.model.moe_paged_stash is True
+    assert main_cfg.model.moe_expert_rank_capacity_factor is None
+    assert perf_cfg.model.moe_expert_rank_capacity_factor == 1.5
+    assert main_cfg.model.moe_paged_stash_buffer_size_factor_cuda == 1.1
+    assert perf_cfg.model.moe_paged_stash_buffer_size_factor_cuda == 1.2
+    assert main_cfg.model.moe_paged_stash_buffer_size_factor_cpu == 0.0
+    assert perf_cfg.model.moe_paged_stash_buffer_size_factor_cpu == 1.0
+    assert main_cfg.model.recompute_granularity == "selective"
+    assert main_cfg.model.recompute_modules == ["moe_act"]
+    assert perf_cfg.model.recompute_granularity is None
+    assert perf_cfg.model.recompute_modules is None
 
     # Full-iteration graphs conflict with the main recipe's loss-NaN check and
     # therefore remain benchmark-only.
@@ -893,9 +890,6 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
         "moe_token_dispatcher_type",
         "moe_hybridep_num_sms",
         "offload_modules",
-        "moe_pad_experts_for_cuda_graph_inference",
-        "moe_paged_stash",
-        "moe_expert_rank_capacity_factor",
         "bias_activation_fusion",
         "apply_rope_fusion",
         "moe_router_fusion",
@@ -923,6 +917,16 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
     assert main_cfg.model.use_transformer_engine_op_fuser is False
     assert perf_cfg.model.use_transformer_engine_op_fuser is True
+    assert main_cfg.model.moe_pad_experts_for_cuda_graph_inference is False
+    assert perf_cfg.model.moe_pad_experts_for_cuda_graph_inference is True
+    assert main_cfg.model.moe_paged_stash is False
+    assert perf_cfg.model.moe_paged_stash is True
+    assert main_cfg.model.moe_expert_rank_capacity_factor is None
+    assert perf_cfg.model.moe_expert_rank_capacity_factor == 1.5
+    assert main_cfg.model.recompute_granularity == "selective"
+    assert main_cfg.model.recompute_modules == ["moe_act"]
+    assert perf_cfg.model.recompute_granularity is None
+    assert perf_cfg.model.recompute_modules is None
     assert main_cfg.train.train_iters == 100
     assert perf_cfg.train.train_iters == 50
     assert main_cfg.train.global_batch_size == 8192

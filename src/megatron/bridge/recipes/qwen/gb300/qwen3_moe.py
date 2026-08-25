@@ -31,9 +31,10 @@ def qwen3_235b_a22b_256gpu_gb300_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.model.bias_activation_fusion = True
     cfg.model.apply_rope_fusion = True
     cfg.model.moe_router_fusion = True
-    cfg.model.recompute_granularity = None
+    cfg.model.recompute_granularity = "selective"
     cfg.model.recompute_method = None
     cfg.model.recompute_num_layers = None
+    cfg.model.recompute_modules = ["moe_act"]
     cfg.model.seq_length = 4096
     cfg.dataset.seq_length = 4096
 
@@ -62,11 +63,6 @@ def qwen3_235b_a22b_256gpu_gb300_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.rng.te_rng_tracker = True
     cfg.model.use_te_rng_tracker = True
     cfg.model.offload_modules = []
-    cfg.model.moe_pad_experts_for_cuda_graph_inference = True
-    cfg.model.moe_paged_stash = True
-    cfg.model.moe_expert_rank_capacity_factor = 1.5
-    cfg.model.moe_paged_stash_buffer_size_factor_cuda = 1.2
-    cfg.model.moe_paged_stash_buffer_size_factor_cpu = 1.0
     cfg.model.moe_shared_expert_overlap = False
     cfg.model.high_priority_a2a_comm_stream = True
     cfg.model.use_transformer_engine_op_fuser = False
