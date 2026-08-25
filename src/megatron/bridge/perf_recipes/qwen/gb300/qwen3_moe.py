@@ -465,6 +465,9 @@ def qwen3_235b_a22b_pretrain_256gpu_gb300_fp8mx_config() -> ConfigContainer:
     """Qwen3 235B-A22B benchmark: 256-GPU GB300 MXFP8 recipe plus benchmark overrides."""
     cfg = _qwen3_235b_a22b_256gpu_gb300_fp8mx_pretrain_config()
 
+    cfg.model.pipeline_model_parallel_size = 4
+    cfg.model.virtual_pipeline_model_parallel_size = 12
+    cfg.model.expert_model_parallel_size = 32
     _benchmark_common(cfg)
     cfg.checkpoint.save_interval = 500
     cfg.validation.eval_iters = 32

@@ -863,7 +863,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     perf_module_name: str,
     perf_recipe_name: str,
 ):
-    """Natural-routing candidates preserve measured knobs except required safety settings."""
+    """Natural-routing candidates preserve measured knobs except the memory-safe topology."""
     mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
     patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeMoeBridge)
 
@@ -874,21 +874,14 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
 
     assert main_cfg.mixed_precision == perf_cfg.mixed_precision
     assert main_cfg.comm_overlap == perf_cfg.comm_overlap
-    main_env = dict(main_cfg.env_vars)
-    perf_env = dict(perf_cfg.env_vars)
-    assert main_env.pop("TORCH_NCCL_AVOID_RECORD_STREAMS") == 1
-    assert perf_env.pop("TORCH_NCCL_AVOID_RECORD_STREAMS") == 0
-    assert main_env == perf_env
+    assert main_cfg.env_vars == perf_cfg.env_vars
     assert main_cfg.logger.tensorboard_dir == perf_cfg.logger.tensorboard_dir is None
     assert main_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
     assert main_cfg.train.micro_batch_size == perf_cfg.train.micro_batch_size
 
     equivalent_model_fields = (
         "tensor_model_parallel_size",
-        "pipeline_model_parallel_size",
         "context_parallel_size",
-        "virtual_pipeline_model_parallel_size",
-        "expert_model_parallel_size",
         "expert_tensor_parallel_size",
         "sequence_parallel",
         "moe_flex_dispatcher_backend",
@@ -901,6 +894,19 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     )
     for field_name in equivalent_model_fields:
         assert getattr(main_cfg.model, field_name) == getattr(perf_cfg.model, field_name)
+
+    if "gb200" in main_recipe_name:
+        assert main_cfg.model.pipeline_model_parallel_size == 16
+        assert main_cfg.model.virtual_pipeline_model_parallel_size is None
+        assert perf_cfg.model.pipeline_model_parallel_size == 8
+        assert perf_cfg.model.virtual_pipeline_model_parallel_size == 3
+    else:
+        assert main_cfg.model.pipeline_model_parallel_size == 8
+        assert main_cfg.model.virtual_pipeline_model_parallel_size == 3
+        assert perf_cfg.model.pipeline_model_parallel_size == 4
+        assert perf_cfg.model.virtual_pipeline_model_parallel_size == 12
+    assert main_cfg.model.expert_model_parallel_size == 16
+    assert perf_cfg.model.expert_model_parallel_size == 32
 
     # Full-iteration graphs conflict with the main recipe's loss-NaN check and
     # therefore remain benchmark-only.
