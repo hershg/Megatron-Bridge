@@ -819,6 +819,11 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     assert main_cfg.train.micro_batch_size == 4
     assert main_cfg.scheduler.lr_warmup_iters == 40
     assert main_cfg.scheduler.lr_decay_iters == 100
+    assert main_cfg.checkpoint.save_interval == 50
+    assert perf_cfg.checkpoint.save_interval == 500
+    assert main_cfg.validation.eval_iters == main_cfg.validation.eval_interval == 0
+    assert perf_cfg.validation.eval_iters == 32
+    assert perf_cfg.validation.eval_interval == 500
     assert main_cfg.ddp.check_for_nan_in_grad is True
     assert perf_cfg.ddp.check_for_nan_in_grad is False
     assert main_cfg.rerun_state_machine.check_for_nan_in_loss is True
@@ -912,6 +917,11 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert main_cfg.train.micro_batch_size == (1 if "gb200" in main_recipe_name else 2)
     assert main_cfg.scheduler.lr_warmup_iters == 40
     assert main_cfg.scheduler.lr_decay_iters == 100
+    assert main_cfg.checkpoint.save_interval == 100
+    assert perf_cfg.checkpoint.save_interval == 500
+    assert main_cfg.validation.eval_iters == main_cfg.validation.eval_interval == 0
+    assert perf_cfg.validation.eval_iters == 32
+    assert perf_cfg.validation.eval_interval == 500
 
 
 def test_qwen3_235b_a22b_lora_defaults(monkeypatch: pytest.MonkeyPatch):
