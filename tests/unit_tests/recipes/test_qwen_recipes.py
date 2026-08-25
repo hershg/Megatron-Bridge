@@ -834,6 +834,8 @@ def test_qwen3_30b_a3b_gb200_fp8mx_perf_recipe_uses_main_recipe(
     assert perf_cfg.ddp.check_for_nan_in_grad is False
     assert main_cfg.rerun_state_machine.check_for_nan_in_loss is True
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
+    assert main_cfg.model.use_transformer_engine_op_fuser is False
+    assert perf_cfg.model.use_transformer_engine_op_fuser is True
 
     # Full-iteration graphs conflict with the main recipe's loss-NaN check and
     # therefore remain benchmark-only.
@@ -919,6 +921,8 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert perf_cfg.ddp.check_for_nan_in_grad is False
     assert main_cfg.rerun_state_machine.check_for_nan_in_loss is True
     assert perf_cfg.rerun_state_machine.check_for_nan_in_loss is False
+    assert main_cfg.model.use_transformer_engine_op_fuser is False
+    assert perf_cfg.model.use_transformer_engine_op_fuser is True
     assert main_cfg.train.train_iters == 100
     assert perf_cfg.train.train_iters == 50
     assert main_cfg.train.global_batch_size == 8192

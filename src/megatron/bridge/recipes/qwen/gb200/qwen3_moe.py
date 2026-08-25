@@ -74,7 +74,7 @@ def qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.model.moe_paged_stash_buffer_size_factor_cpu = 1.0
     cfg.model.moe_shared_expert_overlap = False
     cfg.model.high_priority_a2a_comm_stream = True
-    cfg.model.use_transformer_engine_op_fuser = True
+    cfg.model.use_transformer_engine_op_fuser = False
     cfg.model.moe_mlp_glu_interleave_size = 32
     cfg.model.moe_hybridep_num_sms_preprocessing = 32
     cfg.mixed_precision.fp8_dot_product_attention = True
@@ -140,7 +140,7 @@ def qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config() -> ConfigContainer:
     cfg.model.moe_shared_expert_overlap = False
     cfg.model.moe_router_force_load_balancing = False
     cfg.model.high_priority_a2a_comm_stream = True
-    cfg.model.use_transformer_engine_op_fuser = True
+    cfg.model.use_transformer_engine_op_fuser = False
     cfg.model.moe_mlp_glu_interleave_size = 32
     cfg.model.offload_modules = []
     cfg.model.moe_pad_experts_for_cuda_graph_inference = True
