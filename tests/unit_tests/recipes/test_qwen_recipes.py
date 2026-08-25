@@ -875,6 +875,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert main_cfg.mixed_precision == perf_cfg.mixed_precision
     assert main_cfg.comm_overlap == perf_cfg.comm_overlap
     assert main_cfg.env_vars == perf_cfg.env_vars
+    assert main_cfg.logger.tensorboard_dir == perf_cfg.logger.tensorboard_dir is None
     assert main_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
     assert main_cfg.train.micro_batch_size == perf_cfg.train.micro_batch_size
 

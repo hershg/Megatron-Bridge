@@ -89,6 +89,7 @@ def qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.validation.eval_iters = 0
     cfg.validation.eval_interval = 0
     cfg.logger.log_interval = 1
+    cfg.logger.tensorboard_dir = None
 
     cfg.env_vars = {
         **COMMON_RECIPE_ENV_VARS,
