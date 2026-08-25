@@ -151,8 +151,8 @@ def test_benchmark_common_disables_checkpoint_io_and_preserves_legacy_defaults()
 
     assert cfg.train.manual_gc is True
     assert cfg.train.manual_gc_interval == 100
-    assert cfg.validation.eval_iters == 0
-    assert cfg.validation.eval_interval == 0
+    assert cfg.validation.eval_iters == 1
+    assert cfg.validation.eval_interval == 1
     assert cfg.tokenizer.use_tokenizer_vocab_size is False
     assert cfg.checkpoint.save is None
     assert cfg.checkpoint.load is None

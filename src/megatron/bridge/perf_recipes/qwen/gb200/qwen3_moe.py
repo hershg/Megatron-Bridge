@@ -311,6 +311,8 @@ def qwen3_30b_a3b_pretrain_8gpu_gb200_fp8mx_config() -> ConfigContainer:
 
     _benchmark_common(cfg)
     cfg.checkpoint.save_interval = 500
+    cfg.validation.eval_iters = 32
+    cfg.validation.eval_interval = 500
 
     # Full-iteration graphs remain benchmark-only until natural-routing verification.
     _enable_hybridep_full_iteration_mxfp8(cfg)
@@ -453,6 +455,8 @@ def qwen3_235b_a22b_pretrain_256gpu_gb200_fp8mx_config() -> ConfigContainer:
 
     _benchmark_common(cfg)
     cfg.checkpoint.save_interval = 500
+    cfg.validation.eval_iters = 32
+    cfg.validation.eval_interval = 500
     _enable_hybridep_full_iteration_mxfp8(cfg)
     # Keep process settings next to the recipe so users can see the exact benchmark environment.
     cfg.env_vars = {
