@@ -222,7 +222,7 @@ items:
         final_loss: 6.046449
         last_10_steps_step_time_ms_avg: 15807.670
         last_10_steps_model_tflops_per_gpu_avg: 357.220
-        last_10_steps_tokens_per_second_per_gpu_avg: 16590.406
+        last_10_steps_tokens_per_second_per_gpu_avg: 16583.342
       expected_result: >
         On 8x GB200, this support-verification workload completes exactly 100
         bounded RP2 optimizer steps with TP1/PP1/CP1/EP8/ETP1, DP8, SP off,
@@ -495,7 +495,7 @@ items:
         final_loss: 6.046449
         last_10_steps_step_time_ms_avg: 20340.300
         last_10_steps_model_tflops_per_gpu_avg: 277.770
-        last_10_steps_tokens_per_second_per_gpu_avg: 12899.959
+        last_10_steps_tokens_per_second_per_gpu_avg: 12887.912
       resume_comparison:
         reference_item: pretrain
         sentinel_steps: [51, 100]
