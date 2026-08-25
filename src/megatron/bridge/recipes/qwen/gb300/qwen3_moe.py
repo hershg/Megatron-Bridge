@@ -63,6 +63,9 @@ def qwen3_235b_a22b_256gpu_gb300_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.rng.te_rng_tracker = True
     cfg.model.use_te_rng_tracker = True
     cfg.model.offload_modules = []
+    cfg.model.moe_pad_experts_for_cuda_graph_inference = True
+    cfg.model.moe_paged_stash_buffer_size_factor_cuda = 1.2
+    cfg.model.moe_paged_stash_buffer_size_factor_cpu = 1.0
     cfg.model.moe_shared_expert_overlap = False
     cfg.model.high_priority_a2a_comm_stream = True
     cfg.model.use_transformer_engine_op_fuser = False
