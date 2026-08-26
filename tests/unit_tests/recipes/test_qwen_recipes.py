@@ -878,7 +878,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert {k: v for k, v in main_cfg.env_vars.items() if k != hybridep_domain_key} == {
         k: v for k, v in perf_cfg.env_vars.items() if k != hybridep_domain_key
     }
-    assert main_cfg.env_vars[hybridep_domain_key] == 4
+    assert hybridep_domain_key not in main_cfg.env_vars
     assert perf_cfg.env_vars[hybridep_domain_key] == 32
     assert main_cfg.logger.tensorboard_dir == perf_cfg.logger.tensorboard_dir is None
     assert main_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
@@ -889,8 +889,6 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
         "context_parallel_size",
         "expert_tensor_parallel_size",
         "sequence_parallel",
-        "moe_flex_dispatcher_backend",
-        "moe_token_dispatcher_type",
         "moe_hybridep_num_sms",
         "offload_modules",
         "bias_activation_fusion",
@@ -899,6 +897,11 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     )
     for field_name in equivalent_model_fields:
         assert getattr(main_cfg.model, field_name) == getattr(perf_cfg.model, field_name)
+
+    assert main_cfg.model.moe_flex_dispatcher_backend == "deepep"
+    assert main_cfg.model.moe_token_dispatcher_type == "alltoall"
+    assert perf_cfg.model.moe_flex_dispatcher_backend == "hybridep"
+    assert perf_cfg.model.moe_token_dispatcher_type == "flex"
 
     if "gb200" in main_recipe_name:
         assert main_cfg.model.pipeline_model_parallel_size == 16

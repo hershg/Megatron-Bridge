@@ -34,6 +34,8 @@ def _with_global_batch_size(cfg: ConfigContainer, global_batch_size: int) -> Con
 
 
 def _enable_hybridep_full_iteration_mxfp8(cfg: ConfigContainer) -> None:
+    cfg.model.moe_flex_dispatcher_backend = "hybridep"
+    cfg.model.moe_token_dispatcher_type = "flex"
     cfg.model.recompute_granularity = None
     cfg.model.recompute_method = None
     cfg.model.recompute_num_layers = None
