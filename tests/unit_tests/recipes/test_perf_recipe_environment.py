@@ -147,7 +147,7 @@ def test_benchmark_common_disables_checkpoint_io_and_preserves_legacy_defaults()
         mixed_precision=SimpleNamespace(grad_reduce_in_fp32=True),
     )
 
-    _benchmark_common(cfg)
+    _benchmark_common(cfg, force_moe_load_balancing=True)
 
     assert cfg.train.manual_gc is True
     assert cfg.train.manual_gc_interval == 100
@@ -157,6 +157,10 @@ def test_benchmark_common_disables_checkpoint_io_and_preserves_legacy_defaults()
     assert cfg.checkpoint.save is None
     assert cfg.checkpoint.load is None
     assert cfg.model.moe_router_force_load_balancing is True
+
+    cfg.model.moe_router_force_load_balancing = False
+    _benchmark_common(cfg)
+    assert cfg.model.moe_router_force_load_balancing is False
 
 
 def test_every_flat_recipe_builder_declares_its_environment_inline():
