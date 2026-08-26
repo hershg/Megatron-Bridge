@@ -874,7 +874,12 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
 
     assert main_cfg.mixed_precision == perf_cfg.mixed_precision
     assert main_cfg.comm_overlap == perf_cfg.comm_overlap
-    assert main_cfg.env_vars == perf_cfg.env_vars
+    hybridep_domain_key = "NUM_OF_HYBRID_EP_RANKS_PER_NVLINK_DOMAIN"
+    assert {k: v for k, v in main_cfg.env_vars.items() if k != hybridep_domain_key} == {
+        k: v for k, v in perf_cfg.env_vars.items() if k != hybridep_domain_key
+    }
+    assert main_cfg.env_vars[hybridep_domain_key] == 16
+    assert perf_cfg.env_vars[hybridep_domain_key] == 32
     assert main_cfg.logger.tensorboard_dir == perf_cfg.logger.tensorboard_dir is None
     assert main_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
     assert main_cfg.train.micro_batch_size == perf_cfg.train.micro_batch_size
