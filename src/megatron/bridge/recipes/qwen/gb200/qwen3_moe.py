@@ -46,7 +46,7 @@ def qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.model.tensor_model_parallel_size = 1
     cfg.model.pipeline_model_parallel_size = 16
     cfg.model.context_parallel_size = 1
-    cfg.model.virtual_pipeline_model_parallel_size = 3
+    cfg.model.virtual_pipeline_model_parallel_size = None
     cfg.model.expert_model_parallel_size = 16
     cfg.model.expert_tensor_parallel_size = 1
     cfg.model.sequence_parallel = False
@@ -79,8 +79,8 @@ def qwen3_235b_a22b_256gpu_gb200_fp8mx_pretrain_config() -> ConfigContainer:
     cfg.mixed_precision.fp8_dot_product_attention = True
     cfg.comm_overlap = CommOverlapConfig(
         tp_comm_overlap=True,
-        overlap_moe_expert_parallel_comm=True,
-        delay_wgrad_compute=True,
+        overlap_moe_expert_parallel_comm=False,
+        delay_wgrad_compute=False,
     )
 
     cfg.ddp.check_for_nan_in_grad = True

@@ -863,7 +863,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     perf_module_name: str,
     perf_recipe_name: str,
 ):
-    """Natural-routing candidates preserve measured knobs except the memory-safe topology."""
+    """Natural-routing candidates preserve measured knobs except convergence-safe scheduling."""
     mod = importlib.import_module("megatron.bridge.recipes.qwen.qwen3_moe")
     patch_recipe_module_global(monkeypatch, mod, "AutoBridge", _FakeMoeBridge)
 
@@ -873,7 +873,15 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     perf_cfg = perf_recipe()
 
     assert main_cfg.mixed_precision == perf_cfg.mixed_precision
-    assert main_cfg.comm_overlap == perf_cfg.comm_overlap
+    if "gb200" in main_recipe_name:
+        assert main_cfg.comm_overlap.tp_comm_overlap is True
+        assert main_cfg.comm_overlap.overlap_moe_expert_parallel_comm is False
+        assert main_cfg.comm_overlap.delay_wgrad_compute is False
+        assert perf_cfg.comm_overlap.tp_comm_overlap is True
+        assert perf_cfg.comm_overlap.overlap_moe_expert_parallel_comm is True
+        assert perf_cfg.comm_overlap.delay_wgrad_compute is True
+    else:
+        assert main_cfg.comm_overlap == perf_cfg.comm_overlap
     hybridep_domain_key = "NUM_OF_HYBRID_EP_RANKS_PER_NVLINK_DOMAIN"
     assert {k: v for k, v in main_cfg.env_vars.items() if k != hybridep_domain_key} == {
         k: v for k, v in perf_cfg.env_vars.items() if k != hybridep_domain_key
@@ -905,7 +913,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
 
     if "gb200" in main_recipe_name:
         assert main_cfg.model.pipeline_model_parallel_size == 16
-        assert main_cfg.model.virtual_pipeline_model_parallel_size == 3
+        assert main_cfg.model.virtual_pipeline_model_parallel_size is None
         assert perf_cfg.model.pipeline_model_parallel_size == 8
         assert perf_cfg.model.virtual_pipeline_model_parallel_size == 3
     else:
