@@ -897,7 +897,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
 
     if "gb200" in main_recipe_name:
         assert main_cfg.model.pipeline_model_parallel_size == 16
-        assert main_cfg.model.virtual_pipeline_model_parallel_size is None
+        assert main_cfg.model.virtual_pipeline_model_parallel_size == 3
         assert perf_cfg.model.pipeline_model_parallel_size == 8
         assert perf_cfg.model.virtual_pipeline_model_parallel_size == 3
     else:
