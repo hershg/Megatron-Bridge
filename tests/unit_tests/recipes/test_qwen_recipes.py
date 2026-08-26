@@ -878,7 +878,7 @@ def test_qwen3_235b_blackwell_main_recipes_match_measured_perf_settings(
     assert {k: v for k, v in main_cfg.env_vars.items() if k != hybridep_domain_key} == {
         k: v for k, v in perf_cfg.env_vars.items() if k != hybridep_domain_key
     }
-    assert hybridep_domain_key not in main_cfg.env_vars
+    assert main_cfg.env_vars[hybridep_domain_key] == 4
     assert perf_cfg.env_vars[hybridep_domain_key] == 32
     assert main_cfg.logger.tensorboard_dir == perf_cfg.logger.tensorboard_dir is None
     assert main_cfg.train.global_batch_size == perf_cfg.train.global_batch_size
