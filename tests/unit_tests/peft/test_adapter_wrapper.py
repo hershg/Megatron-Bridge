@@ -579,7 +579,8 @@ class TestAdapterWrapper:
         oversized = torch.randn(5, 3)
 
         with pytest.raises(RuntimeError, match="complete contiguous allocation"):
-            _AddExpertLoRA.apply(rank_input, weight, oversized[:4])
+            partial = oversized[:4]
+            _AddExpertLoRA.apply(rank_input, weight, partial, partial.detach())
 
     def test_peft_enable_disable_adapter_layers_manual(self, mock_linear_simple, simple_adapter):
         """Test manual adapter enable/disable via PEFT helpers."""

@@ -29,13 +29,22 @@ class _AddExpertLoRA(torch.autograd.Function):
     """Accumulate an expert LoRA projection into a consumed grouped-linear output."""
 
     @staticmethod
-    def forward(ctx, rank_input: torch.Tensor, weight: torch.Tensor, base_output: torch.Tensor):
+    def forward(
+        ctx,
+        rank_input: torch.Tensor,
+        weight: torch.Tensor,
+        base_output: torch.Tensor,
+        destination: torch.Tensor,
+    ):
         if (
             base_output.ndim != 2
             or rank_input.ndim != 2
             or not base_output.is_contiguous()
             or base_output.storage_offset() != 0
             or base_output.untyped_storage().nbytes() != base_output.numel() * base_output.element_size()
+            or destination.shape != base_output.shape
+            or destination.data_ptr() != base_output.data_ptr()
+            or destination.requires_grad
         ):
             raise RuntimeError("Grouped-linear output does not cover one complete contiguous allocation")
         if rank_input.shape[0] != base_output.shape[0] or weight.shape != (
@@ -49,9 +58,9 @@ class _AddExpertLoRA(torch.autograd.Function):
             raise RuntimeError("Expert LoRA projection and grouped-linear output must share a dtype")
 
         ctx.save_for_backward(rank_input, weight)
-        output = base_output.detach()
-        torch.addmm(output, rank_input, weight.t(), beta=1, out=output)
-        return output
+        ctx.mark_dirty(destination)
+        torch.addmm(destination, rank_input, weight.t(), beta=1, out=destination)
+        return destination
 
     @staticmethod
     def backward(ctx, grad_output: torch.Tensor):
@@ -59,7 +68,7 @@ class _AddExpertLoRA(torch.autograd.Function):
         grad_rank_input = grad_output @ weight if ctx.needs_input_grad[0] else None
         grad_weight = grad_output.t() @ rank_input if ctx.needs_input_grad[1] else None
         grad_base_output = grad_output if ctx.needs_input_grad[2] else None
-        return grad_rank_input, grad_weight, grad_base_output
+        return grad_rank_input, grad_weight, grad_base_output, None
 
 
 class LoRALinear(AdapterWrapper):
@@ -134,7 +143,8 @@ class LoRALinear(AdapterWrapper):
         rank_output, _ = adapter.linear_in(x)
         rank_output = adapter.activation(rank_output)
         rank_output = rank_output * (adapter.alpha / adapter.dim)
-        return _AddExpertLoRA.apply(rank_output, adapter.linear_out.weight, linear_output)
+        destination = linear_output.detach()
+        return _AddExpertLoRA.apply(rank_output, adapter.linear_out.weight, linear_output, destination)
 
     def forward(self, x: torch.Tensor, *args: Any, **kwargs: Any):
         """Forward pass that combines the wrapped module output with the adapter output.
