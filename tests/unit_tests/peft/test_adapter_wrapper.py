@@ -465,7 +465,13 @@ class TestAdapterWrapper:
         assert base.weight.grad is not None
         assert adapter.weight.grad is not None
 
-    def test_grouped_expert_fc2_reuses_base_output_with_exact_gradients(self):
+    @pytest.mark.parametrize(
+        ("surface", "input_is_parallel"),
+        (("linear_fc1", False), ("linear_fc2", True)),
+    )
+    def test_grouped_expert_linear_reuses_base_output_with_exact_gradients(
+        self, surface: str, input_is_parallel: bool
+    ):
         """The grouped expert path must not allocate a second full-width output."""
 
         class ViewLinearFunction(torch.autograd.Function):
@@ -514,7 +520,7 @@ class TestAdapterWrapper:
             def __init__(self, in_features, out_features, rank):
                 super().__init__()
                 self.is_expert = True
-                self.input_is_parallel = True
+                self.input_is_parallel = input_is_parallel
                 self.disable_sequence_parallel_comm = True
                 self.activation = nn.Identity()
                 self.dropout = nn.Identity()
@@ -523,7 +529,7 @@ class TestAdapterWrapper:
                     cpu_offloading_activations=False,
                     expert_tensor_parallel_size=1,
                 )
-                self.base_linear_name = "decoder.layers.0.mlp.experts.linear_fc2"
+                self.base_linear_name = f"decoder.layers.0.mlp.experts.{surface}"
                 self.use_a2a = False
                 self.dim = rank
                 self.alpha = rank
@@ -558,9 +564,12 @@ class TestAdapterWrapper:
             adapter.use_a2a = True
             assert not wrapper._can_reuse_grouped_expert_output(x, actual)
             adapter.use_a2a = False
-            adapter.base_linear_name = "decoder.layers.0.mlp.experts.linear_fc1"
+            adapter.input_is_parallel = not input_is_parallel
             assert not wrapper._can_reuse_grouped_expert_output(x, actual)
-            adapter.base_linear_name = "decoder.layers.0.mlp.experts.linear_fc2"
+            adapter.input_is_parallel = input_is_parallel
+            adapter.base_linear_name = "decoder.layers.0.mlp.experts.linear_fc3"
+            assert not wrapper._can_reuse_grouped_expert_output(x, actual)
+            adapter.base_linear_name = f"decoder.layers.0.mlp.experts.{surface}"
         actual_grads = torch.autograd.grad(
             actual,
             (x, base.weight, adapter.linear_in.weight, adapter.linear_out.weight),
