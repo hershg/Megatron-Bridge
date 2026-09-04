@@ -114,7 +114,7 @@ class LoRALinear(AdapterWrapper):
         grouped_linear_type = getattr(te, "GroupedLinear", None)
         if grouped_linear_type is None or not isinstance(self.to_wrap, grouped_linear_type):
             return False
-        if not isinstance(adapter, ParallelLinearAdapter) or not adapter.is_expert or not adapter.input_is_parallel:
+        if not isinstance(adapter, ParallelLinearAdapter) or not adapter.is_expert:
             return False
         if not isinstance(adapter.activation, nn.Identity) or not isinstance(adapter.dropout, nn.Identity):
             return False
@@ -124,9 +124,17 @@ class LoRALinear(AdapterWrapper):
             return False
         linear_in = adapter.linear_in
         linear_out = adapter.linear_out
+        surface = adapter.base_linear_name.rsplit(".", maxsplit=1)[-1]
+        if surface == "linear_fc1":
+            if adapter.input_is_parallel:
+                return False
+        elif surface == "linear_fc2":
+            if not adapter.input_is_parallel:
+                return False
+        else:
+            return False
         return (
-            adapter.base_linear_name.rsplit(".", maxsplit=1)[-1] == "linear_fc2"
-            and not adapter.use_a2a
+            not adapter.use_a2a
             and getattr(adapter.config, "expert_tensor_parallel_size", 1) == 1
             and x.ndim == 2
             and linear_output.ndim == 2
