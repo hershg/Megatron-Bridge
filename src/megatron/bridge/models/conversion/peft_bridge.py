@@ -999,20 +999,30 @@ class MegatronPeftBridge:
         model_config: object,
     ) -> tuple[tuple[str, int | bool | None], ...]:
         """Return only the model fields required by a destination transform."""
-        if transform != "split_qkv":
+        if transform == "split_qkv":
+            fields = (
+                "num_attention_heads",
+                "num_query_groups",
+                "kv_channels",
+                "hidden_size",
+                "attention_output_gate",
+            )
+            optional = {"attention_output_gate"}
+        elif transform == "split_gdn_in_proj":
+            fields = (
+                "linear_key_head_dim",
+                "linear_value_head_dim",
+                "linear_num_key_heads",
+                "linear_num_value_heads",
+            )
+            optional = set()
+        else:
             return ()
-        fields = (
-            "num_attention_heads",
-            "num_query_groups",
-            "kv_channels",
-            "hidden_size",
-            "attention_output_gate",
-        )
         values = []
         for field in fields:
             value = getattr(model_config, field, None)
-            if field != "attention_output_gate" and value is None:
-                raise ValueError(f"QKV LoRA export requires model config field {field!r}")
+            if field not in optional and value is None:
+                raise ValueError(f"{transform} LoRA export requires model config field {field!r}")
             values.append((field, value))
         return tuple(values)
 
