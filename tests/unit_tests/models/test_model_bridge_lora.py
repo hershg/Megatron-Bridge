@@ -2638,6 +2638,7 @@ def test_build_local_adapter_weight_snapshots_fp32_and_replication_metadata() ->
             "model.layers.0.self_attn.k_proj.lora_A.weight",
             "model.layers.0.self_attn.v_proj.lora_A.weight",
         ],
+        model_config=SimpleNamespace(),
     )
 
     assert result.component == "linear_in"

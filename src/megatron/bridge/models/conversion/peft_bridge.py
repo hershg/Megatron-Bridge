@@ -144,6 +144,7 @@ class LocalAdapterWeight:
     expert_parallel_axis: int | None
     expert_parallel_rank: int
     expert_parallel_size: int
+    transform_config: tuple[tuple[str, int | bool | None], ...]
 
 
 def _select_hf_base_param_name(base_mapping, adapter_key: Optional[str], expected_suffix: str) -> Optional[str]:
@@ -932,11 +933,13 @@ class MegatronPeftBridge:
                     adapter_task,
                     component="linear_in",
                     hf_param_names=linear_in_names,
+                    model_config=megatron_model[0].config,
                 )
                 yield self._build_local_adapter_weight(
                     adapter_task,
                     component="linear_out",
                     hf_param_names=linear_out_names,
+                    model_config=megatron_model[0].config,
                 )
 
     def _build_local_adapter_weight(
@@ -945,6 +948,7 @@ class MegatronPeftBridge:
         *,
         component: Literal["linear_in", "linear_out"],
         hf_param_names: List[str],
+        model_config: object,
     ) -> LocalAdapterWeight:
         """Build one transport record from a local adapter task."""
         task = adapter_task.linear_in_task if component == "linear_in" else adapter_task.linear_out_task
@@ -973,6 +977,7 @@ class MegatronPeftBridge:
             transform = "split_gated_mlp"
         else:
             transform = "identity"
+        transform_config = self._build_local_adapter_transform_config(transform, model_config)
         return LocalAdapterWeight(
             global_param_name=task.global_param_name,
             hf_param_names=tuple(hf_param_names),
@@ -985,7 +990,31 @@ class MegatronPeftBridge:
             expert_parallel_axis=0 if adapter_task.requires_expert_splits else None,
             expert_parallel_rank=mapping.ep_rank,
             expert_parallel_size=mapping.ep_size,
+            transform_config=transform_config,
         )
+
+    def _build_local_adapter_transform_config(
+        self,
+        transform: str,
+        model_config: object,
+    ) -> tuple[tuple[str, int | bool | None], ...]:
+        """Return only the model fields required by a destination transform."""
+        if transform != "split_qkv":
+            return ()
+        fields = (
+            "num_attention_heads",
+            "num_query_groups",
+            "kv_channels",
+            "hidden_size",
+            "attention_output_gate",
+        )
+        values = []
+        for field in fields:
+            value = getattr(model_config, field, None)
+            if field != "attention_output_gate" and value is None:
+                raise ValueError(f"QKV LoRA export requires model config field {field!r}")
+            values.append((field, value))
+        return tuple(values)
 
     def stream_adapter_weights_megatron_to_hf(
         self,
