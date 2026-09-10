@@ -2601,3 +2601,50 @@ def test_column_parallel_mapping_skips_ep_gather_for_adapters(monkeypatch):
 
     result = mapping.megatron_to_hf(torch.ones(2, 2), None)
     torch.testing.assert_close(result["hf_param"], torch.ones(2, 2))
+
+
+def test_build_local_adapter_weight_snapshots_fp32_and_replication_metadata() -> None:
+    source = torch.ones((2, 3), dtype=torch.bfloat16)
+    mapping = Mock()
+    mapping.maybe_dequantize.side_effect = lambda tensor: tensor
+    mapping.tp_rank = 1
+    mapping.tp_size = 8
+    mapping.ep_rank = 3
+    mapping.ep_size = 8
+    task = AdapterWeightConversionTask(
+        global_base_prefix="decoder.layers.0.self_attention.linear_qkv",
+        adapter_key=None,
+        alpha=32,
+        dim=32,
+        linear_in_task=WeightConversionTask(
+            param_name="local_in",
+            global_param_name="decoder.layers.0.self_attention.linear_qkv.adapter.linear_in.weight",
+            mapping=mapping,
+            param_weight=source,
+        ),
+        linear_out_task=WeightConversionTask(
+            param_name="local_out",
+            global_param_name="decoder.layers.0.self_attention.linear_qkv.adapter.linear_out.weight",
+            mapping=mapping,
+            param_weight=source,
+        ),
+    )
+
+    result = DummyBridge()._build_local_adapter_weight(
+        task,
+        component="linear_in",
+        hf_param_names=[
+            "model.layers.0.self_attn.q_proj.lora_A.weight",
+            "model.layers.0.self_attn.k_proj.lora_A.weight",
+            "model.layers.0.self_attn.v_proj.lora_A.weight",
+        ],
+    )
+
+    assert result.component == "linear_in"
+    assert result.transform == "replicate"
+    assert result.weight.dtype is torch.float32
+    assert result.weight.data_ptr() != source.data_ptr()
+    assert result.tensor_parallel_axis is None
+    assert result.tensor_parallel_rank == 1
+    assert result.tensor_parallel_size == 8
+    assert result.expert_parallel_axis is None

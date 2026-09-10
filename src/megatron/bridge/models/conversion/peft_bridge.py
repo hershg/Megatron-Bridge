@@ -18,7 +18,7 @@ import itertools
 from collections import defaultdict
 from dataclasses import dataclass
 from string import digits
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Dict, Iterable, List, Literal, Optional, TypeVar, Union
 
 import torch
 from megatron.core import parallel_state
@@ -121,6 +121,29 @@ class AdapterWeight:
     dim: int
     linear_in_weight: "MegatronWeightTuple"
     linear_out_weight: "MegatronWeightTuple"
+
+
+@dataclass(frozen=True)
+class LocalAdapterWeight:
+    """One rank-local FP32 adapter source and its reconstruction recipe.
+
+    ``weight`` is a detached snapshot owned by the caller. The remaining fields
+    describe how the tensor participates in regular HF/PEFT export without
+    gathering it over TP or EP. A remote consumer can move the source and apply
+    the same reconstruction at its destination.
+    """
+
+    global_param_name: str
+    hf_param_names: tuple[str, ...]
+    component: Literal["linear_in", "linear_out"]
+    transform: Literal["identity", "replicate", "split_qkv", "split_gated_mlp", "split_gdn_in_proj"]
+    weight: torch.Tensor
+    tensor_parallel_axis: int | None
+    tensor_parallel_rank: int
+    tensor_parallel_size: int
+    expert_parallel_axis: int | None
+    expert_parallel_rank: int
+    expert_parallel_size: int
 
 
 def _select_hf_base_param_name(base_mapping, adapter_key: Optional[str], expected_suffix: str) -> Optional[str]:
@@ -846,6 +869,123 @@ class MegatronPeftBridge:
         if mapping.tp_size > 1:
             tensor = torch.cat(mapping.gather_from_tp_ranks(tensor), dim=tp_axis)
         return tensor
+
+    def stream_local_adapter_weights(
+        self,
+        megatron_model: Union[MegatronModel, List[MegatronModel]],
+        exclude_adapter_base_prefixes: Iterable[str] | None = None,
+    ) -> Iterable[LocalAdapterWeight]:
+        """Yield rank-local FP32 adapter snapshots without TP or EP materialization.
+
+        This method exposes the same adapter naming and fused-projection metadata
+        used by :meth:`stream_adapter_weights_megatron_to_hf`, but leaves every
+        TP and EP shard on its owning rank. Pipeline parallel export remains
+        unsupported because its task discovery is collective; callers must use
+        the regular exporter when PP is greater than one.
+
+        Args:
+            megatron_model: Megatron model instance or local model chunks.
+            exclude_adapter_base_prefixes: Adapter base prefixes to omit.
+
+        Yields:
+            LocalAdapterWeight records with FP32 tensor snapshots and ownership
+            metadata for destination-side reconstruction.
+
+        Raises:
+            ValueError: If pipeline parallelism is enabled or an adapter has no
+                HF parameter mapping.
+        """
+        if parallel_state.get_pipeline_model_parallel_world_size() != 1:
+            raise ValueError(
+                "Rank-local adapter export does not support pipeline parallelism; "
+                "use stream_adapter_weights_megatron_to_hf instead."
+            )
+        if not isinstance(megatron_model, list):
+            megatron_model = [megatron_model]
+
+        for adapter_tasks in self.build_adapter_conversion_tasks(
+            megatron_model,
+            exclude_adapter_base_prefixes=exclude_adapter_base_prefixes,
+        ).values():
+            for adapter_task in adapter_tasks:
+                base_suffix = (
+                    ".weight0"
+                    if (
+                        is_expert_linear(adapter_task.global_base_prefix)
+                        and ".local_experts." not in adapter_task.global_base_prefix
+                    )
+                    else ".weight"
+                )
+                base_hf_names = self._get_base_hf_param_names_for_adapter(
+                    self.mapping_registry(),  # type: ignore[attr-defined]
+                    adapter_task.global_base_prefix,
+                    adapter_task.adapter_key,
+                    base_suffix,
+                )
+                if not base_hf_names:
+                    raise ValueError(
+                        "No HF mapping found for rank-local adapter export, "
+                        f"global_base_prefix={adapter_task.global_base_prefix!r}"
+                    )
+                linear_in_names, linear_out_names = self._build_lora_hf_names(base_hf_names)
+                yield self._build_local_adapter_weight(
+                    adapter_task,
+                    component="linear_in",
+                    hf_param_names=linear_in_names,
+                )
+                yield self._build_local_adapter_weight(
+                    adapter_task,
+                    component="linear_out",
+                    hf_param_names=linear_out_names,
+                )
+
+    def _build_local_adapter_weight(
+        self,
+        adapter_task: AdapterWeightConversionTask,
+        *,
+        component: Literal["linear_in", "linear_out"],
+        hf_param_names: List[str],
+    ) -> LocalAdapterWeight:
+        """Build one transport record from a local adapter task."""
+        task = adapter_task.linear_in_task if component == "linear_in" else adapter_task.linear_out_task
+        tensor = task.param_weight
+        if tensor is None:
+            raise ValueError(f"Rank-local adapter source is absent for {task.global_param_name!r}")
+        mapping = task.mapping
+        tensor = mapping.maybe_dequantize(tensor).detach().to(dtype=torch.float32).contiguous().clone()
+        if isinstance(mapping, RowParallelMapping):
+            tensor_parallel_axis = 2 if adapter_task.requires_expert_splits else 1
+        elif isinstance(mapping, ColumnParallelMapping):
+            tensor_parallel_axis = 1 if adapter_task.requires_expert_splits else 0
+        else:
+            tensor_parallel_axis = None
+        if component == "linear_in" and len(hf_param_names) > 1:
+            transform: Literal["identity", "replicate", "split_qkv", "split_gated_mlp", "split_gdn_in_proj"] = (
+                "replicate"
+            )
+        elif self._is_fused_qkv(hf_param_names):
+            transform = "split_qkv"
+        elif self._is_gdn_in_proj_split(hf_param_names):
+            transform = "split_gdn_in_proj"
+        elif len(hf_param_names) == 2 and all(
+            self._is_fused_fc1_gate_proj(name) or self._is_fused_fc1_up_proj(name) for name in hf_param_names
+        ):
+            transform = "split_gated_mlp"
+        else:
+            transform = "identity"
+        return LocalAdapterWeight(
+            global_param_name=task.global_param_name,
+            hf_param_names=tuple(hf_param_names),
+            component=component,
+            transform=transform,
+            weight=tensor,
+            tensor_parallel_axis=tensor_parallel_axis,
+            tensor_parallel_rank=mapping.tp_rank,
+            tensor_parallel_size=mapping.tp_size,
+            expert_parallel_axis=0 if adapter_task.requires_expert_splits else None,
+            expert_parallel_rank=mapping.ep_rank,
+            expert_parallel_size=mapping.ep_size,
+        )
 
     def stream_adapter_weights_megatron_to_hf(
         self,
