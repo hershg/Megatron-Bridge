@@ -2611,6 +2611,7 @@ def test_build_local_adapter_weight_snapshots_fp32_and_replication_metadata() ->
     mapping.tp_size = 8
     mapping.ep_rank = 3
     mapping.ep_size = 8
+    mapping.is_expert = False
     task = AdapterWeightConversionTask(
         global_base_prefix="decoder.layers.0.self_attention.linear_qkv",
         adapter_key=None,
@@ -2649,6 +2650,8 @@ def test_build_local_adapter_weight_snapshots_fp32_and_replication_metadata() ->
     assert result.tensor_parallel_rank == 1
     assert result.tensor_parallel_size == 8
     assert result.expert_parallel_axis is None
+    assert result.expert_parallel_rank == 0
+    assert result.expert_parallel_size == 1
 
 
 @pytest.mark.parametrize("projection", ["fc1", "fc2"])

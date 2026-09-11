@@ -1085,6 +1085,7 @@ class MegatronPeftBridge:
         else:
             transform = "identity"
         transform_config = self._build_local_adapter_transform_config(transform, model_config)
+        is_expert = mapping.is_expert
         return LocalAdapterWeight(
             global_param_name=task.global_param_name,
             hf_param_names=tuple(hf_param_names),
@@ -1094,9 +1095,9 @@ class MegatronPeftBridge:
             tensor_parallel_axis=tensor_parallel_axis,
             tensor_parallel_rank=mapping.tp_rank,
             tensor_parallel_size=mapping.tp_size,
-            expert_parallel_axis=0 if tensor.ndim == 3 else None,
-            expert_parallel_rank=mapping.ep_rank,
-            expert_parallel_size=mapping.ep_size,
+            expert_parallel_axis=0 if is_expert and tensor.ndim == 3 else None,
+            expert_parallel_rank=mapping.ep_rank if is_expert else 0,
+            expert_parallel_size=mapping.ep_size if is_expert else 1,
             transform_config=transform_config,
         )
 
