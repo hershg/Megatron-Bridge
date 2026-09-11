@@ -919,7 +919,10 @@ class MegatronPeftBridge:
                 )
                 if is_grouped_expert:
                     expert_names = self._get_base_hf_param_names_for_adapter(
-                        self.mapping_registry(), adapter_task.global_base_prefix, adapter_task.adapter_key, ".weight0"
+                        self.mapping_registry(),  # type: ignore[attr-defined]
+                        adapter_task.global_base_prefix,
+                        adapter_task.adapter_key,
+                        ".weight0",
                     )
                     if any(self._infer_hf_expert_idx(name) is not None for name in expert_names):
                         yield from self._stream_local_grouped_adapter_weights(adapter_task, megatron_model[0].config)
@@ -967,7 +970,8 @@ class MegatronPeftBridge:
         """Emit grouped factors with explicit global expert names and local ownership."""
         shared_outer = adapter_task.linear_in_task.param_weight.ndim != adapter_task.linear_out_task.param_weight.ndim
         mapping_registry = self.mapping_registry()  # type: ignore[attr-defined]
-        for component in ("linear_in", "linear_out"):
+        components: tuple[Literal["linear_in", "linear_out"], ...] = ("linear_in", "linear_out")
+        for component_index, component in enumerate(components):
             task = adapter_task.linear_in_task if component == "linear_in" else adapter_task.linear_out_task
             if task.mapping.tp_size != 1:
                 raise ValueError("Rank-local grouped expert export requires expert tensor parallel size 1")
@@ -979,8 +983,7 @@ class MegatronPeftBridge:
             )
             if not base_names:
                 raise ValueError(f"No HF mapping found for {adapter_task.global_base_prefix!r}")
-            suffix = f".{component}.weight"
-            hf_names = [self._make_lora_param_name(name, suffix) for name in base_names]
+            hf_names = self._build_lora_hf_names(base_names)[component_index]
             record = self._build_local_adapter_weight(
                 adapter_task, component=component, hf_param_names=hf_names, model_config=model_config
             )
@@ -994,7 +997,7 @@ class MegatronPeftBridge:
                 )
                 continue
 
-            local_experts, remainder = divmod(model_config.num_moe_experts, record.expert_parallel_size)
+            local_experts, remainder = divmod(getattr(model_config, "num_moe_experts"), record.expert_parallel_size)
             if remainder or (tensor.ndim == 3 and tensor.shape[0] != local_experts):
                 raise ValueError("Rank-local grouped expert export requires evenly partitioned experts")
             expert_names = []
@@ -1008,13 +1011,13 @@ class MegatronPeftBridge:
                 )
                 if not base_names:
                     raise ValueError(f"No HF mapping found for expert {expert_index}")
-                hf_names = tuple(self._make_lora_param_name(name, suffix) for name in base_names)
-                expert_names.append(hf_names)
+                names = tuple(self._build_lora_hf_names(base_names)[component_index])
+                expert_names.append(names)
                 if tensor.ndim == 3:
                     yield replace(
                         record,
                         global_param_name=f"{record.global_param_name}.expert{expert_index}",
-                        hf_param_names=hf_names,
+                        hf_param_names=names,
                         weight=record.weight[local_index],
                         tensor_parallel_axis=None,
                         expert_parallel_axis=None,
@@ -1029,7 +1032,7 @@ class MegatronPeftBridge:
                 parts = record.weight.chunk(2, dim=0)
                 names_by_part = list(zip(*expert_names, strict=True))
             elif record.transform in ("identity", "replicate"):
-                parts = [record.weight]
+                parts = (record.weight,)
                 names_by_part = [tuple(itertools.chain.from_iterable(expert_names))]
             else:
                 raise ValueError(f"Unsupported shared expert transform {record.transform!r}")
