@@ -212,6 +212,11 @@ class LoRA(PEFT, ModuleMatcher):
                 is_grouped_expert_name and not self.share_expert_adapters and not use_shared_outer_adapter
             )
             use_grouped_expert_adapter = use_shared_outer_adapter or use_per_expert_adapter
+            op_fuser_parallel_size = (
+                parallel_state.get_expert_tensor_parallel_world_size()
+                if is_expert
+                else parallel_state.get_tensor_model_parallel_world_size()
+            )
 
             enable_op_fuser = (
                 not use_grouped_expert_adapter
@@ -219,8 +224,8 @@ class LoRA(PEFT, ModuleMatcher):
                     self.use_transformer_engine_op_fuser
                     or getattr(module.config, "use_transformer_engine_op_fuser", False)
                 )
-                # TP not yet supported
-                and parallel_state.get_tensor_model_parallel_world_size() == 1
+                # TP is not yet supported by the corresponding LoRA adapter branch.
+                and op_fuser_parallel_size == 1
             )
 
             logger.info(f"Adding lora to: {full_name}")

@@ -275,7 +275,8 @@ class TestLoRA:
         )
 
         with (
-            patch.object(parallel_state, "get_tensor_model_parallel_world_size", return_value=1),
+            patch.object(parallel_state, "get_tensor_model_parallel_world_size", return_value=2),
+            patch.object(parallel_state, "get_expert_tensor_parallel_world_size", return_value=1),
             patch("megatron.bridge.peft.lora.is_expert_linear", return_value=True),
             patch("megatron.bridge.peft.lora.get_adapter_attributes_from_linear", return_value=attrs),
             patch("megatron.bridge.peft.lora.ParallelLinearAdapter", return_value=nn.Identity()),
