@@ -18,6 +18,7 @@ from typing import Dict, List, Literal, Optional
 
 import torch
 import torch.nn as nn
+import transformer_engine.pytorch as te
 from megatron.core import parallel_state
 from megatron.core.optimizer import OptimizerConfig, ParamKey, get_standard_config_overrides
 from megatron.core.optimizer_param_scheduler import ParamGroupOverride
@@ -217,9 +218,14 @@ class LoRA(PEFT, ModuleMatcher):
                 if is_expert
                 else parallel_state.get_tensor_model_parallel_world_size()
             )
+            grouped_linear_type = getattr(te, "GroupedLinear", None)
+            is_grouped_linear = grouped_linear_type is not None and isinstance(
+                module, grouped_linear_type
+            )
 
             enable_op_fuser = (
                 not use_grouped_expert_adapter
+                and not is_grouped_linear
                 and (
                     self.use_transformer_engine_op_fuser
                     or getattr(module.config, "use_transformer_engine_op_fuser", False)

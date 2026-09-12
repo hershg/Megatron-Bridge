@@ -285,6 +285,30 @@ class TestLoRA:
 
         assert isinstance(transformed, TEFusedLoRAMergeLinear)
 
+    def test_lora_grouped_expert_uses_output_reuse_instead_of_op_fuser(self):
+        model = MockMegatronLinear(8, 8)
+        lora = LoRA(target_modules=["linear_fc2"], use_transformer_engine_op_fuser=True)
+        attrs = AdapterAttributes(
+            input_is_parallel=True,
+            in_features=8,
+            out_features=8,
+            disable_tensor_parallel_comm=False,
+            disable_sequence_parallel_comm=True,
+            base_linear_is_parallel=True,
+        )
+
+        with (
+            patch.object(parallel_state, "get_tensor_model_parallel_world_size", return_value=2),
+            patch.object(parallel_state, "get_expert_tensor_parallel_world_size", return_value=1),
+            patch("megatron.bridge.peft.lora.is_expert_linear", return_value=True),
+            patch("megatron.bridge.peft.lora.get_adapter_attributes_from_linear", return_value=attrs),
+            patch("megatron.bridge.peft.lora.ParallelLinearAdapter", return_value=nn.Identity()),
+            patch("megatron.bridge.peft.lora.te.GroupedLinear", MockMegatronLinear),
+        ):
+            transformed = lora.transform(model, name="linear_fc2")
+
+        assert type(transformed) is LoRALinear
+
     def test_lora_transform_simple_model(self):
         """Test LoRA transformation on a simple model."""
         model = SimpleModel()
